@@ -353,3 +353,12 @@ SENDGRID_API_KEY=tu_sendgrid_api_key_aqui
 ```
 
 </details>
+
+---
+
+### 👨‍💻 Información del Desarrollador
+
+* **Desarrollador:** [Edwin Aliaga Yujra](https://www.linkedin.com/in/edwin-aliaga-yujra)
+* **Institución:** Universidad Mayor de San Andrés (UMSA)
+* **Materia:** Taller de Sistemas de Información (INF-281)
+* **Contexto:** Plataforma integral "Bicentenario" para la gestión de eventos masivos, integrando microservicios, IA y despliegue en la nube.
