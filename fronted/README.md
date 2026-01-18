@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+<div align="center">
+  <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/nextjs/nextjs-original.svg" width="120" alt="Next.js Logo" />
 
-## Getting Started
+  # 🎨 Frontend - Plataforma Bicentenario
 
-First, run the development server:
+  ### *Interfaz de usuario moderna e interactiva para la gestión de eventos*
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+  [![Next.js](https://img.shields.io/badge/Next.js-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
+  [![React](https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
+  [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+  [![Google Auth](https://img.shields.io/badge/Google_Auth-4285F4?style=for-the-badge&logo=google&logoColor=white)](#)
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+  ---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+  **Interfaz desarrollada en Next.js para consumir la API robusta del sistema Bicentenario. Ofrece una experiencia de usuario fluida, segura y optimizada para la inscripción a eventos masivos.**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+</div>
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 🚀 Características del Cliente
+Esta interfaz actúa como el punto de interacción principal con el sistema, destacando por:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+* **Autenticación Social:** Integración con Google Auth para un registro rápido y seguro.
+* **Dashboard Dinámico:** Visualización de eventos disponibles, agendas personales y estadísticas en tiempo real.
+* **Diseño Responsivo:** Optimizado para dispositivos móviles y escritorio mediante Tailwind CSS.
+* **Integración con Backend:** Consumo eficiente de endpoints REST para la gestión de usuarios, roles y multimedia.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 🛠️ Stack Tecnológico
+* **Framework:** Next.js (React)
+* **Estilos:** Tailwind CSS
+* **Estado y Autenticación:** Librerías de integración con Google y manejo de JWT.
+* **Consumo de API:** Axios / Fetch para comunicación con el Backend en NestJS.
 
-## Deploy on Vercel
+## ⚙️ Configuración y Ejecución
+1. Entrar a la carpeta: `cd frontend`
+2. Instalar dependencias: `npm install`
+3. Configurar `.env` con la URL del Backend: `NEXT_PUBLIC_API_URL=http://localhost:3000`
+4. Iniciar desarrollo: `npm run dev`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
+### 👥 Créditos y Colaboración
+Este módulo Frontend forma parte del proyecto integral para la materia **Taller de Sistemas de Información (INF-281)**.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+* **Desarrollo Backend & Arquitectura de Datos:** [Edwin Aliaga Yujra](https://www.linkedin.com/in/edwin-aliaga-yujra)
+* **Institución:** Universidad Mayor de San Andrés (UMSA)
