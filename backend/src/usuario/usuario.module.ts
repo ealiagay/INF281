@@ -4,9 +4,11 @@ import { UsuarioController } from './usuario.controller';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { EmailService } from './email.service';
 import { AuthModule } from '../auth/auth.module';
+import { CloudinaryModule } from '../cloudinary/cloudinary.module'
+import { CasbinModule } from '../rbac/casbin.module';
 
 @Module({
-  imports: [PrismaModule,AuthModule],
+  imports: [PrismaModule,AuthModule,CloudinaryModule,CasbinModule],
   controllers: [UsuarioController],
   providers: [UsuarioService, EmailService],
   exports: [UsuarioService, EmailService],

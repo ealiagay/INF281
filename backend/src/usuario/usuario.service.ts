@@ -4,162 +4,208 @@ import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { PrismaService } from 'src/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { EmailService } from './email.service';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 @Injectable()
 export class UsuarioService {
-  // Guarda temporalmente el body - código - tiempo de expiración
-  private pendingVerifications = new Map<string, { 
-    data: CreateUsuarioDto; 
-    code: string; 
+
+  constructor(
+    private prisma: PrismaService,
+    private emailService: EmailService,
+    private cloudinaryService: CloudinaryService,
+  ) {}
+
+  // Almacena email -> { id, code, expired, timeout }
+  private pendingVerifications = new Map<string, {
+    userId: string;
+    code: string;
     expired: boolean;
-    timeout: NodeJS.Timeout 
+    timeout: NodeJS.Timeout;
   }>();
 
-  constructor(private prisma: PrismaService, private emailService: EmailService) {}
-
-  async getUsers() {
-    return await this.prisma.usuario.findMany();
-  }
 
   async registerUser(createUsuarioDto: CreateUsuarioDto) {
-    // Verificar si el correo ya está registrado
-    const existingUser = await this.prisma.usuario.findUnique({
+    const existing = await this.prisma.usuarios.findUnique({
       where: { email: createUsuarioDto.email },
     });
-
-    if (existingUser) {
+  
+    if (existing) {
       throw new BadRequestException('El correo ya está registrado.');
     }
+  
+    const rolUsuario = await this.prisma.roles.findUnique({
+      where: { nombre: 'usuario_casual' },
+    });
+  
+    if (!rolUsuario) {
+      throw new BadRequestException('No se encontró el rol usuario_casual');
+    }
+  
+    const hashedPassword = await bcrypt.hash(createUsuarioDto.contrasena, 10);
 
-    // Generar código de verificación
-    return await this.generateVerificationCode(createUsuarioDto);
-  }
+    let fotoPorDefecto='https://res.cloudinary.com/djxsfzosx/image/upload/v1743944383/perfil_usuario/rtnyh2skqqldxmneuhai.jpg';
+    if (createUsuarioDto.genero === 'Femenino') {
+      fotoPorDefecto = 'https://res.cloudinary.com/djxsfzosx/image/upload/v1743944383/perfil_usuario/z5ddxqhziqenaaehpx4y.jpg';
+    }
 
-  async generateVerificationCode(createUsuarioDto: CreateUsuarioDto) {
-    const email = createUsuarioDto.email;
-
-    // Generar código aleatorio de 5 dígitos
-    //const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const verificationCode = Math.floor(10000 + Math.random() * 90000).toString();
     
-    // Si ya existe un código previo, eliminarlo
+    const newUser = await this.prisma.usuarios.create({
+      data: {
+        nombre: createUsuarioDto.nombre,
+        apellidopaterno: createUsuarioDto.apellidopaterno,
+        apellidomaterno: createUsuarioDto.apellidomaterno,
+        email: createUsuarioDto.email,
+        contrasena: hashedPassword,
+        telefono: createUsuarioDto.telefono,
+        pais: createUsuarioDto.pais,
+        ciudad: createUsuarioDto.ciudad,
+        genero: createUsuarioDto.genero,
+        foto: createUsuarioDto.foto || fotoPorDefecto,
+        verificado: false,
+  
+        id_rol: rolUsuario.id_rol,
+      },
+    });
+
+    await this.registrarActividad(
+      newUser.id_usuario, 
+      'Registro de Datos', 
+      'El usuario se registró exitosamente.'
+    );
+
+    await this.generateVerificationCode(newUser.id_usuario, newUser.email);
+  
+    return { message: 'Revisa tu correo para verificar tu cuenta.' };
+    
+  }
+  
+  private async generateVerificationCode(userId: string, email: string) {
+    const code = Math.floor(10000 + Math.random() * 90000).toString();
+
     if (this.pendingVerifications.has(email)) {
       clearTimeout(this.pendingVerifications.get(email)?.timeout);
       this.pendingVerifications.delete(email);
     }
 
-    // Configurar eliminación automática en 2 minutos (120000 ms)
     const timeout = setTimeout(() => {
-      const pendingData = this.pendingVerifications.get(email);
-      if (pendingData) {
-        pendingData.expired = true;
-        console.log(`⏳ Código de verificación expirado para: ${email}`);
+      const item = this.pendingVerifications.get(email);
+      if (item) {
+        item.expired = true;
+        console.log(`⏳ Código expirado para: ${email}`);
       }
-    }, 120000);
 
+    }, 120000); // 2 min
     this.pendingVerifications.set(email, {
-      data: createUsuarioDto,
-      code: verificationCode,
+      userId,
+      code,
       expired: false,
       timeout,
     });
 
-    await this.emailService.sendVerificationEmail(email, verificationCode);
-
-    return { message: 'Código de verificación enviado. Revisa tu correo.' };
+    await this.emailService.sendVerificationEmail(email, code);
   }
 
-  async verifyAndCreateUser(email: string, code: string) {
-    const pendingData = this.pendingVerifications.get(email);
+  async verifyUser(email: string, code: string) {
+    const usu = this.pendingVerifications.get(email);
 
-    if (!pendingData) {
-      throw new BadRequestException('No se encontró una solicitud de verificación o ya expiró.');
+    if (!usu) {
+      throw new BadRequestException('No se encontró un código de verificación o ya expiró.');
     }
 
-    if (pendingData.expired) {
-      throw new BadRequestException('El código de verificación ha expirado. Solicita un nuevo código.');
+    if (usu.expired) {
+      throw new BadRequestException('El código ha expirado.');
     }
 
-    if (pendingData.code !== code) {
-      throw new BadRequestException('Código incorrecto.');
+    if (usu.code !== code) {
+      throw new BadRequestException('El código es incorrecto.');
     }
 
-    clearTimeout(pendingData.timeout);
+    const usuario = await this.prisma.usuarios.findUnique({
+      where: { email },
+    });
+  
+    if (!usuario) {
+      throw new NotFoundException('Usuario no encontrado.');
+    }
 
-    const hashedPassword = await bcrypt.hash(pendingData.data.contrasena, 10);
-
-    const newUser = await this.prisma.usuario.create({
+    await this.prisma.usuarios.update({
+      where: { email },
       data: {
-        nombre: pendingData.data.nombre,
-        apellidoPaterno: pendingData.data.apellidoPaterno,
-        apellidoMaterno: pendingData.data.apellidoMaterno,
-        email: pendingData.data.email,
-        contrasena: hashedPassword,
-        telefono: pendingData.data.telefono,
-        pais: pendingData.data.pais,
-        ciudad: pendingData.data.ciudad,
-        genero: pendingData.data.genero,
+        verificado: true,
       },
     });
 
+    clearTimeout(usu.timeout);
     this.pendingVerifications.delete(email);
 
-    return { message: 'Usuario registrado con éxito' };
+    await this.registrarActividad(
+      usuario.id_usuario,
+      'Verificacion de Datos',
+      'El usuario verificó su cuenta de correo electrónico.'
+    );
+
+    
+    return { message: 'Cuenta verificada exitosamente ✅' };
   }
 
-
   async resendVerificationCode(email: string) {
-    console.log("📩 Intentando reenviar código para:", email);
-  
-    if (!email) {
-      console.log("ERROR: El email recibido es vacío.");
-      throw new BadRequestException("El email es requerido.");
+    const user = await this.prisma.usuarios.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new BadRequestException('No se encontró el usuario.');
     }
-  
-  
-    let pendingData = this.pendingVerifications.get(email);
-  
-    if (!pendingData) {
-      console.log(`No se encontró un código para: ${email}`);
-      throw new BadRequestException('No se encontró un registro de usuario pendiente.');
+
+    if (user.verificado) {
+      throw new BadRequestException('Este usuario ya está verificado.');
     }
+
+    await this.generateVerificationCode(user.id_usuario, email);
+    return { message: 'Nuevo código generado. Revisa tu correo.' };
+  }
+
   
-    if (pendingData.expired) {
-      console.log(`Código expirado. Generando uno nuevo para: ${email}`);
-      return await this.generateVerificationCode(pendingData.data);
-    }
-  
-    console.log(`Código aún válido. Reenviando para: ${email}`);
-    await this.emailService.sendVerificationEmail(email, pendingData.code);
-  
-    return { message: 'Código reenviado. Revisa tu correo.' };
+  async findAll() {
+    return await this.prisma.usuarios.findMany();
   }
   
 
   async findOne(id: string) {
-    const usuario = await this.prisma.usuario.findUnique({
-      where: { id },
+    const usuario = await this.prisma.usuarios.findUnique({
+      where: { id_usuario: id },
     });
-
+  
     if (!usuario) {
       throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
     }
-
+  
+    await this.registrarActividad(
+      id,
+      'Pedir Datos',
+      'El usuario solicitó sus datos personales.'
+    );
+  
     return usuario;
   }
+  
+
 
   async remove(id: string) {
-    const usuario = await this.prisma.usuario.findUnique({ where: { id } });
-
+    const usuario = await this.prisma.usuarios.findUnique({ where: { id_usuario: id } });
+  
     if (!usuario) {
       throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
     }
-
-    return await this.prisma.usuario.delete({ where: { id } });
+  
+    await this.prisma.usuarios.delete({ where: { id_usuario: id } });
+  
+    return { message: '✅ Usuario eliminado correctamente' };
   }
+  
 
   async updateUser(id: string, updateUsuarioDto: UpdateUsuarioDto) {
-    const usuario = await this.prisma.usuario.findUnique({ where: { id } });
+    const usuario = await this.prisma.usuarios.findUnique({ where: { id_usuario: id } });
 
     if (!usuario) {
       throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
@@ -169,9 +215,54 @@ export class UsuarioService {
       updateUsuarioDto.contrasena = await bcrypt.hash(updateUsuarioDto.contrasena, 10);
     }
 
-    return await this.prisma.usuario.update({
-      where: { id },
-      data: { ...updateUsuarioDto },
+    if ('email' in updateUsuarioDto || 'id_rol' in updateUsuarioDto) {
+      throw new BadRequestException('No puedes actualizar tu email o tu rol.');
+    }
+
+    const actualizado = await this.prisma.usuarios.update({
+      where: { id_usuario: id },
+      data: updateUsuarioDto,
+    });
+
+    await this.registrarActividad(id, 'Actualización de datos', 'El usuario actualizó su información personal.');
+
+    return {message: '✅ Usuario actualizado correctamente'};
+  }
+
+  // Método para actualizar solo la foto del usuario
+  async updateFoto(id: string, file: Express.Multer.File) {
+    const usuario = await this.prisma.usuarios.findUnique({ where: { id_usuario: id } });
+
+    if (!usuario) {
+      throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
+    }
+
+    let fotoUrl = usuario.foto;
+
+    if (file) {
+      console.log('📤 Subiendo imagen a Cloudinary...');
+      const result = await this.cloudinaryService.uploadImage(file, 'perfil_usuario');
+      console.log('🌐 URL obtenida:', result.secure_url);
+      fotoUrl = result.secure_url;
+    }
+
+    const actualizado = await this.prisma.usuarios.update({
+      where: { id_usuario: id },
+      data: { foto: fotoUrl },
+    });
+
+    await this.registrarActividad(id, 'Actualización de foto', 'El usuario actualizó la foto de su perfil.');
+    return {message: '✅ Foto de usuario actualizada correctamente'};
+  }
+  async registrarActividad(id_usuario: string, tipo: string, descripcion: string) {
+    await this.prisma.historial_Actividades.create({
+      data: {
+        id_usuario,
+        fecha_actividad: new Date(),
+        tipo_actividad: tipo,
+        descripcion,
+      },
     });
   }
+  
 }
